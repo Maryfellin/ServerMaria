@@ -1,39 +1,41 @@
-
 #pragma comment( lib, "ws2_32.lib" )
 #include <stdio.h>
 #include <locale.h>
 #include <winsock2.h>
-#include <Ws2tcpip.h> /*для сервера*/
+#include <Ws2tcpip.h> 
 
 using namespace std;
+
+char ServerIP[] = "127.0.0.1";
+int Port = 1509;
 
 int main()
 {
 	setlocale(LC_ALL, "russian");
 	WSADATA WSAData;
 
-	SOCKET server, client; //сокеты
+	SOCKET server, client;
 
-	/*объект, который содержит информацию об адресе.*/
 	SOCKADDR_IN serverAddr, clientAddr;
 
-	WSAStartup(MAKEWORD(2, 0), &WSAData); //указание версии winsock
+	WSAStartup(MAKEWORD(2, 0), &WSAData);
 	server = socket(AF_INET, SOCK_STREAM, 0);
 
-	/*Сервер будет запущен на порту 5555 и будет отображать сообщения клиента*/
-	serverAddr.sin_addr.s_addr = INADDR_ANY;
+	/*Указываем IP-адрес сокета, к которому он должен подключиться и порт*/
 	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(5555);
+	serverAddr.sin_addr.s_addr = inet_addr(ServerIP);
+	serverAddr.sin_port = htons(Port);
 
-	/*Связываем сокет с IP - адресом и номером порта*/
+	/*Связываем сокет с IP-адресом и номером порта*/
 	bind(server, (SOCKADDR *)&serverAddr, sizeof(serverAddr));
 	listen(server, 0);
 
+	/*связь с сокетом*/
 	printf("Прослушивание входящих соединений... \n");
 
+	/*создание буфера*/
 	char buffer[1024];
 	int clientAddrSize = sizeof(clientAddr);
-	/*Функция accept осуществляет связь с сокетом*/
 	if ((client = accept(server, (SOCKADDR *)&clientAddr, &clientAddrSize)) != INVALID_SOCKET)
 	{
 		printf("Клиент подключился! \n");
@@ -42,9 +44,10 @@ int main()
 		printf(buffer);
 		printf("\n");
 		memset(buffer, 0, sizeof(buffer));
-
+		getchar();
 		closesocket(client);
 		printf("Клиент не подключен");
-		getchar();
 	}
+	return 1;
+
 }
