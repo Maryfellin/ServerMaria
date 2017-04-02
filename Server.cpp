@@ -42,6 +42,9 @@ int main()
 		recv(client, buffer, sizeof(buffer), 0);
 		printf("Сообщение: ");
 		printf(buffer);
+
+		send(client, buffer, sizeof(buffer), 0); //отправили клиенту
+
 		printf("\n");
 		memset(buffer, 0, sizeof(buffer));
 		getchar();
