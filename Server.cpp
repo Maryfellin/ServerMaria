@@ -38,11 +38,10 @@ int main()
 	int clientAddrSize = sizeof(clientAddr);
 	if ((client = accept(server, (SOCKADDR *)&clientAddr, &clientAddrSize)) != INVALID_SOCKET)
 	{
-		send(client, "Hello world", 12, 0); //отправили клиенту
 		printf("Клиент подключился! \n");
-		//recv(client, buffer, sizeof(buffer), 0);
-		printf("Сообщение: ");
-		//printf(buffer);
+		recv(client, buffer, sizeof(buffer), 0);
+		printf("Сообщение отправлено: ");
+		printf(buffer);
 
 		printf("\n");
 		memset(buffer, 0, sizeof(buffer));
