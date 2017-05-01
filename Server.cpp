@@ -19,8 +19,6 @@ int Port = 1509;
 SOCKET Connections[1000]; /*коллекция сокетов, массив в котором подключенные пользователи*/
 int ClientCount = 0; /*кол-во подключаемых пользователей, изначально 0*/
 
-//SOCKET server, client;
-//SOCKET Listen; /*сокет для подключения*/
 
 bool ProcessPacket(int ID, Packet packettype)
 {
@@ -89,7 +87,7 @@ int main()
 
 	SOCKET newConnection; //Сокет для подключения клиента
 	int ConnectionCounter = 0;
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < 1000; i++)
 
 	{
 		newConnection = accept(sListen, (SOCKADDR*)&addr, &addrlen); //Примите новое подключение
@@ -99,24 +97,24 @@ int main()
 		}
 		else //Если клиент принят
 		{
-			printf("Клиент подключился! \n");
-			Connections[i] = newConnection; //Установите сокет в массиве, чтобы быть самым новым соединением, прежде чем создавать поток для обработки сокета этого клиента.
-			ClientCount += 1; //Увеличение общего количества подключенных клиентов
-			cout << "Всего клиентов: " << ClientCount << endl;
-			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandlerThread, (LPVOID)(i), NULL, NULL); //Создать поток для обработки этого клиента. Индекс в массиве сокетов для этого потока - это значение (i).
-			std::string buftest = "Добро пожаловать!";
-			int size = buftest.size(); //Получить размер сообщения в байтах и сохранить его в int size
-			Packet chatmessagepacket = Message; //Создать тип пакета: Chat Message, отправляемое на сервер
-			send(Connections[i], (char*)&chatmessagepacket, sizeof(Packet), NULL); //Отправить тип пакета: Chat Message
-			send(Connections[i], (char*)&size, sizeof(int), NULL); //отправить размер сообщения
-			send(Connections[i], buftest.c_str(), buftest.size(), NULL); //отправить сообщение
-			printf("\n");
+				printf("Клиент подключился! \n");
+				Connections[i] = newConnection; //Установите сокет в массиве, чтобы быть самым новым соединением, прежде чем создавать поток для обработки сокета этого клиента.
+				ClientCount += 1; //Увеличение общего количества подключенных клиентов
+				cout << "Всего клиентов: " << ClientCount << endl;
+				CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandlerThread, (LPVOID)(i), NULL, NULL); //Создать поток для обработки этого клиента. Индекс в массиве сокетов для этого потока - это значение (i).
+				std::string buftest = "Добро пожаловать!";
+				int size = buftest.size(); //Получить размер сообщения в байтах и сохранить его в int size
+				Packet chatmessagepacket = Message; //Создать тип пакета: Chat Message, отправляемое на сервер
+				send(Connections[i], (char*)&chatmessagepacket, sizeof(Packet), NULL); //Отправить тип пакета: Chat Message
+				send(Connections[i], (char*)&size, sizeof(int), NULL); //отправить размер сообщения
+				send(Connections[i], buftest.c_str(), buftest.size(), NULL); //отправить сообщение
+				printf("\n");
 
-			Packet testpacket = Test;
-			send(Connections[i], (char*)&testpacket, sizeof(Packet), NULL); //отправить тестовый пакет
+				Packet testpacket = Test;
+				send(Connections[i], (char*)&testpacket, sizeof(Packet), NULL); //отправить тестовый пакет
+
+			}
 		}
-	}
 	system("pause");
-	return 0;
-
+		return 0;
 }
