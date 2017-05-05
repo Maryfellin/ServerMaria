@@ -4,68 +4,130 @@
 #include <winsock2.h>
 #include <iostream>
 #include <Ws2tcpip.h> 
+#include <iomanip>
+#include <cstring>
 
 using namespace std;
 
 enum Packet
 {
-	Message,
-	Test
+	Message
 };
 
 char ServerIP[] = "127.0.0.1";
 int Port = 1509;
 
-SOCKET Connections[1000]; /*коллекция сокетов, массив в котором подключенные пользователи*/
+SOCKET Connections[100]; /*коллекция сокетов, массив в котором подключенные пользователи*/
 int ClientCount = 0; /*кол-во подключаемых пользователей, изначально 0*/
 
-
-bool ProcessPacket(int ID, Packet packettype)
+bool Send(int ID, int _int)
 {
-	switch (packettype)
+	int RetnCheck = send(Connections[ID], (char*)&_int, sizeof(int), NULL);
+	if (RetnCheck == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool Get(int ID, int & _int)
+{
+	int RetnCheck = recv(Connections[ID], (char*)&_int, sizeof(int), NULL); //приём
+	if (RetnCheck == SOCKET_ERROR) //Если есть проблема с подключением
+		return false;
+	return true;
+}
+
+bool SendPacket(int ID, Packet _packettype)
+{
+	int RetnCheck = send(Connections[ID], (char*)&_packettype, sizeof(Packet), NULL); //отправить пакет
+	if (RetnCheck == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool GetPacket(int ID, Packet & _packettype)
+{
+	int RetnCheck = recv(Connections[ID], (char*)&_packettype, sizeof(Packet), NULL); //получение пакета
+	if (RetnCheck == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool SendString(int ID, std::string & _string)
+{
+	if (!SendPacket(ID, Message))
+		return false;
+	int bufferlength = _string.size();
+	if (!Send(ID, bufferlength))
+		return false;
+	int RetnCheck = send(Connections[ID], _string.c_str(), bufferlength, NULL);
+	if (RetnCheck == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+
+bool GetString(int ID, std::string & _string)
+{
+	int bufferlength; //длина сообщения
+	if (!Get(ID, bufferlength)) //получить длину буфера и сохранить его в переменной: bufferlength
+		return false;
+	char * buffer = new char[bufferlength + 1]; //выделение буфера
+	buffer[bufferlength] = '\0'; //устанавливаем последний символ буфера нулевым
+	int RetnCheck = recv(Connections[ID], buffer, bufferlength, NULL); //получаем сообщение и сохраняем в массиве буферов
+	_string = buffer; //установить строку в полученное сообщение буфера
+	delete[] buffer;
+	if (RetnCheck == SOCKET_ERROR) //если соединение потеряно во время получения сообщения
+		return false;
+	return true;
+}
+
+bool ProcessPacket(int ID, Packet _packettype)
+{
+	switch (_packettype)
 	{
 	case Message:
 	{
-		int bufferlength; //Длина строки
-		//для получения строки
-		int recvcheck = recv(Connections[ID], (char*)&bufferlength, sizeof(int), NULL); //Получить длину буфера
-		char * buffer = new char[bufferlength]; //Выделить буфер
-		recv(Connections[ID], buffer, bufferlength, NULL); //Получить сообщение буфера от клиента
-		for (int i = 0; i < ClientCount; i++) //Для каждого клиентского соединения
-		{
-			if (i == ID) //Не отправляйте сообщение чату тому же пользователю, который его отправил
-				continue; //Пропустить пользователя
-			Packet chatmessagepacket = Message; //Создать пакет сообщений чата, который будет отправлен
-			send(Connections[i], (char*)&chatmessagepacket, sizeof(Packet), NULL); //Отправить пакет сообщений чата
-			send(Connections[i], (char*)&bufferlength, sizeof(int), NULL);//Отправить длину буфера клиенту с индексом i
-			send(Connections[i], buffer, bufferlength, NULL);//Отправить сообщение клиенту по индексу i
-			printf("\n");
+		std::string Message; //Строка для хранения полученного нами сообщения
+		if (!GetString(ID, Message)) //Получить сообщение чата и сохранить его в переменной
+			return false; 
 
+		for (int i = 0; i < ClientCount; i++) // Далее нам нужно отправить сообщение каждому пользователю
+		{
+			if (i == ID) //Если соединение - это пользователь, который отправил сообщение ...
+				continue;//Переход к следующему пользователю
+			if (!SendString(i, Message))
+			{
+				std::cout << "Не удалось отправить сообщение клиента с ID: " << ID << " клиенту с ID: " << i << std::endl;
+			}
 		}
-		delete[] buffer; // Освободить буфер, чтобы остановить утечку памяти
+		std::cout << "Сообщение от клиента: " << ID << std::endl;
 		break;
 	}
+
 	default:
-		printf("Неизвестный пакет.");
+	{
+		std::cout << "Неизвестный пакет" << _packettype << std::endl;
 		break;
+	}
 	}
 	return true;
 }
 
 void ClientHandlerThread(int ID)
 {
+	Packet PacketType;
 	while (true)
 	{
-		//Сначала получаем тип пакета
-		Packet packettype;
-		recv(Connections[ID], (char*)&packettype, sizeof(Packet), NULL); //Получение типа пакета от клиента
-
-		//Как только у нас будет тип пакета, обработаем пакет
-		if (!ProcessPacket(ID, packettype))
+		if (!GetPacket(ID, PacketType))
+			break;
+		if (!ProcessPacket(ID, PacketType))
 			break;
 	}
-	closesocket(Connections[ID]); //Закрыть сокет, который использовался для подключения клиента
+	std::cout << "Потеряна связь с клиентом: " << ID << std::endl;
+	closesocket(Connections[ID]);
 }
+
+
 
 int main()
 {
@@ -83,38 +145,30 @@ int main()
 	bind(sListen, (SOCKADDR*)&addr, sizeof(addr)); // Связывание адреса с сокетом
 	listen(sListen, SOMAXCONN);
 
-	printf("Прослушивание входящих соединений...\n");
+	cout << "Прослушивание входящих соединений...\n";
 
 	SOCKET newConnection; //Сокет для подключения клиента
 	int ConnectionCounter = 0;
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 100; i++)
 
 	{
 		newConnection = accept(sListen, (SOCKADDR*)&addr, &addrlen); //Примите новое подключение
 		if (newConnection == 0) //Если не удалось принять соединение клиента
 		{
-			printf("Ошибка подключения клиента");
+			std::cout << "Ошибка подключения клиента" << std::endl;
 		}
 		else //Если клиент принят
 		{
-				printf("Клиент подключился! \n");
-				Connections[i] = newConnection; //Установите сокет в массиве, чтобы быть самым новым соединением, прежде чем создавать поток для обработки сокета этого клиента.
-				ClientCount += 1; //Увеличение общего количества подключенных клиентов
-				cout << "Всего клиентов: " << ClientCount << endl;
-				CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandlerThread, (LPVOID)(i), NULL, NULL); //Создать поток для обработки этого клиента. Индекс в массиве сокетов для этого потока - это значение (i).
-				std::string buftest = "Добро пожаловать!";
-				int size = buftest.size(); //Получить размер сообщения в байтах и сохранить его в int size
-				Packet chatmessagepacket = Message; //Создать тип пакета: Chat Message, отправляемое на сервер
-				send(Connections[i], (char*)&chatmessagepacket, sizeof(Packet), NULL); //Отправить тип пакета: Chat Message
-				send(Connections[i], (char*)&size, sizeof(int), NULL); //отправить размер сообщения
-				send(Connections[i], buftest.c_str(), buftest.size(), NULL); //отправить сообщение
-				printf("\n");
-
-				Packet testpacket = Test;
-				send(Connections[i], (char*)&testpacket, sizeof(Packet), NULL); //отправить тестовый пакет
-
-			}
+			std::cout << "Клиент подключился! \n" << std::endl;
+			Connections[i] = newConnection; //Установите сокет в массиве, чтобы быть самым новым соединением, прежде чем создавать поток для обработки сокета этого клиента.
+			ClientCount += 1; //Увеличение общего количества подключенных клиентов
+			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandlerThread, (LPVOID)(i), NULL, NULL); //Создать поток для обработки этого клиента. Индекс в массиве сокетов для этого потока - это значение (i).
+			std::string buftest = "";
+			int size = buftest.size(); //Получить размер сообщения в байтах и сохранить его в int size
+			std::string MOTD = "Добро пожаловать!";
+			SendString(i, MOTD);
 		}
+	}
 	system("pause");
-		return 0;
+	return 0;
 }
